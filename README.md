@@ -1,7 +1,9 @@
 # jsonb_apply: Functional json for postgres
 [![build](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml/badge.svg)](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml)
 
-Exploring whether something like this is useful:
+While browsing Postgres' source code, I came across the [`transform_jsonb_string_values`](https://github.com/postgres/postgres/blob/82b07eba9e8b863cc05adb7e53a86ff02b51d888/src/include/utils/jsonfuncs.h#L62) function.
+
+Which gave me the idea to try something like this:
 
 ```tsql
 select jsonb_apply(jsonb, func)
