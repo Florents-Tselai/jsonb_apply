@@ -1,0 +1,17 @@
+.deps/
+.idea/
+*.o
+*.so
+build/
+dist/
+*.egg-info/
+archive/
+
+/*.png
+/results/
+/pgdata/
+/docs/
+/.readthedocs.yaml
+/jsonb_apply.dylib
+/regression.diffs
+/regression.out
