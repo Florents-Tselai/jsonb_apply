@@ -1,4 +1,5 @@
 # jsonb_apply: Functional json for postgres
+[![build](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml/badge.svg)](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml)
 
 Exploring whether something like this is useful:
 
