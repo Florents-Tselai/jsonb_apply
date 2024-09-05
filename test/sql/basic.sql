@@ -98,3 +98,4 @@ select jsonb_apply('"hELLo"', 'upper(text)');
 -- reverse was a bit tricky
 select jsonb_apply('["Hello", {"k": "value"}]', 'reverse(text)');
 select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)');
+

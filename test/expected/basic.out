@@ -171,3 +171,4 @@ select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": 
  {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
 (1 row)
 
+
