@@ -28,7 +28,7 @@ select jsonb_apply('"hello"', 'replace(text, text, text)');
 -- order by proname;
 
 
-select jsonb_apply('"hELLo"', 'btrim(text)');
+select jsonb_apply('"    hELLo  "', 'btrim(text)');
 
 
 select jsonb_apply('"hELLo"', 'current_setting(text)');
@@ -44,7 +44,7 @@ select jsonb_apply('"hELLo"', 'lower(text)');
 
 
 
-select jsonb_apply('"hELLo"', 'ltrim(text)');
+select jsonb_apply('"   hELLo  "', 'ltrim(text)');
 
 
 
@@ -81,7 +81,7 @@ select jsonb_apply('"hELLo"', 'quote_nullable(text)');
 select jsonb_apply('"hELLo"', 'reverse(text)');
 
 
-select jsonb_apply('"hELLo"', 'rtrim(text)');
+select jsonb_apply('"  hELLo  "', 'rtrim(text)');
 
 
 select jsonb_apply('"hELLo"', 'similar_to_escape(text)');
@@ -94,3 +94,7 @@ select jsonb_apply('"hELLo"', 'unistr(text)');
 
 
 select jsonb_apply('"hELLo"', 'upper(text)');
+
+-- reverse was a bit tricky
+select jsonb_apply('["Hello", {"k": "value"}]', 'reverse(text)');
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)');

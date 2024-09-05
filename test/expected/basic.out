@@ -60,7 +60,7 @@ ERROR:  only functions with pronargs=1 are supported, requested function has pro
 --     where proargtypes = '25'::oidvector
 --   and prorettype = 25
 -- order by proname;
-select jsonb_apply('"hELLo"', 'btrim(text)');
+select jsonb_apply('"    hELLo  "', 'btrim(text)');
  jsonb_apply 
 -------------
  "hELLo"
@@ -83,10 +83,10 @@ select jsonb_apply('"hELLo"', 'lower(text)');
  "hello"
 (1 row)
 
-select jsonb_apply('"hELLo"', 'ltrim(text)');
+select jsonb_apply('"   hELLo  "', 'ltrim(text)');
  jsonb_apply 
 -------------
- "hELLo"
+ "hELLo  "
 (1 row)
 
 select jsonb_apply('"hELLo"', 'max(text)');
@@ -132,10 +132,10 @@ select jsonb_apply('"hELLo"', 'reverse(text)');
  "oLLEh"
 (1 row)
 
-select jsonb_apply('"hELLo"', 'rtrim(text)');
+select jsonb_apply('"  hELLo  "', 'rtrim(text)');
  jsonb_apply 
 -------------
- "hELLo"
+ "  hELLo"
 (1 row)
 
 select jsonb_apply('"hELLo"', 'similar_to_escape(text)');
@@ -156,5 +156,18 @@ select jsonb_apply('"hELLo"', 'upper(text)');
  jsonb_apply 
 -------------
  "HELLO"
+(1 row)
+
+-- reverse was a bit tricky
+select jsonb_apply('["Hello", {"k": "value"}]', 'reverse(text)');
+        jsonb_apply        
+---------------------------
+ ["olleH", {"k": "eulav"}]
+(1 row)
+
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
 (1 row)
 
