@@ -106,8 +106,8 @@ jsonb_apply(PG_FUNCTION_ARGS) {
                                      &state->funcregproc))
 
         ereport(ERROR,
-            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                errmsg("Invalid function name: %s", funcdef)));
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                        errmsg("Invalid function name: %s", funcdef)));
 
     state->funcoid = DatumGetObjectId(state->funcregproc);
 
@@ -130,7 +130,7 @@ jsonb_apply(PG_FUNCTION_ARGS) {
 
     if (state->procStruct->pronargs != 1)
         elog(ERROR, "only functions with pronargs=1 are supported, requested function has pronargs=%d",
-         state->procStruct->pronargs);
+             state->procStruct->pronargs);
     if (state->procStruct->prorettype != TEXTOID)
         elog(ERROR, "requested function does not return \"text\", but oid=%d", state->procStruct->prorettype);
 
@@ -145,6 +145,47 @@ jsonb_apply(PG_FUNCTION_ARGS) {
 
 Datum
 jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types) {
+    Jsonb *jb = DatumGetJsonbP(args[0]);
+    char *funcdef = text_to_cstring(DatumGetTextPP(args[1]));
+    Datum result;
+
+    HeapTuple tuple;
+    Datum funcregproc;
+    Form_pg_proc funcform; /* corresponds to a pointer to a tuple with the format of pg_proc relation. */
+
+    /* Search for the function in the catalog */
+    if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
+                                     InvalidOid, -1,
+                                     NULL,
+                                     &funcregproc))
+
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                        errmsg("Invalid function name: %s", funcdef)));
+
+
+    /* Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation) */
+    tuple = SearchSysCache1(PROCOID, funcregproc);
+    if (!HeapTupleIsValid(tuple))
+        elog(ERROR, "cache lookup failed for function %u", DatumGetObjectId(funcregproc));
+    funcform = (Form_pg_proc) GETSTRUCT(tuple);
+    ReleaseSysCache(tuple);
+
+    /* Now that we have found our function we can perform some sanity checks */
+    if ((funcform->pronargs != nargs - 1))
+        elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(funcform->proname),
+             funcform->pronargs, nargs - 2);
+
+    if (funcform->prorettype != TEXTOID)
+        elog(ERROR, "function %s does not return text", NameStr(funcform->proname));
+
+
+    printf("variadic: proname=%s\tpronargs=%d\tprorettype=%d\n",
+           NameStr(funcform->proname),
+           funcform->pronargs,
+           funcform->prorettype
+    );
+
     PG_RETURN_DATUM(DirectFunctionCall1(jsonb_in, CStringGetDatum("\"bye world\"")));
 }
 
