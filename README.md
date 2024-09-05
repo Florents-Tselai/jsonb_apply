@@ -8,16 +8,6 @@ select jsonb_apply(jsonb, func);
 ```
 No? Well, here's a Postgres extension that allows you to do just that:
 
-## Installation
-
-```
-cd /tmp
-git clone https://github.com/Florents-Tselai/jsonb_apply.git
-cd jsonb_apply
-make
-make install # may need sudo
-```
-
 ## Usage
 
 Currently supports `func(text)->text` functions applied recursively to string values or elements in `jsonb`.
@@ -60,11 +50,15 @@ select jsonb_apply('{
 (1 row)
 ```
 
-While browsing Postgres' source code, I came across the [`transform_jsonb_string_values`](https://github.com/postgres/postgres/blob/82b07eba9e8b863cc05adb7e53a86ff02b51d888/src/include/utils/jsonfuncs.h#L62) function.
-
-Which gave me the idea to try something like this:
-
-
 ## Installation
+
 ```
-``
+cd /tmp
+git clone https://github.com/Florents-Tselai/jsonb_apply.git
+cd jsonb_apply
+make
+make install # may need sudo
+```
+
+While browsing Postgres' source code, I came across the [`transform_jsonb_string_values`](https://github.com/postgres/postgres/blob/82b07eba9e8b863cc05adb7e53a86ff02b51d888/src/include/utils/jsonfuncs.h#L62) function,
+which gave me the idea.
