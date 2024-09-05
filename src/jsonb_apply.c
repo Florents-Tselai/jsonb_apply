@@ -60,9 +60,10 @@ apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     } else {
 
         /* Can't figure out why some funcs need a copy. So making them all use copy. */
-        char *elemcopy = (char *) malloc(elem_len);
+        char *elemcopy = (char *) malloc(elem_len + 1);
         if (elemcopy != NULL) {
             memcpy(elemcopy, elem_value, elem_len);
+            elemcopy[elem_len] = '\0';
         }
 
         func_result = OidFunctionCall1(funcoid, CStringGetTextDatum(elemcopy));
