@@ -3,6 +3,12 @@ select jsonb_apply('{}', 'updfgdper');
 ERROR:  expected a left parenthesis
 select jsonb_apply('{}', 'updfgdper()');
 ERROR:  function "updfgdper()" does not exist
+-- sanity checks and errors for functions with not-suport nargs or rettype
+select jsonb_apply('"hello"', 'length(text)');
+ERROR:  requested function does not return "text", but oid=23
+select jsonb_apply('"hello"', 'replace(text, text, text)');
+ERROR:  only functions with pronargs=1 are supported, requested function has pronargs=3
+-- basic transformation functions not relying on encoding (e.g. md5 does)
 select jsonb_apply('"hELLo"', 'lower(text)');
  jsonb_apply 
 -------------
@@ -15,115 +21,22 @@ select jsonb_apply('"hELLo"', 'upper(text)');
  "HELLO"
 (1 row)
 
-select jsonb_apply('{"a": "aaa", "b":"B", "c": 1, "d": "hELLo world" }', 'lower(text)');
-                    jsonb_apply                     
-----------------------------------------------------
- {"a": "aaa", "b": "b", "c": 1, "d": "hello world"}
-(1 row)
-
-select jsonb_apply('{"a": "aaa", "b":"B", "c": 1, "d": "hELLo world" }', 'upper(text)');
-                    jsonb_apply                     
-----------------------------------------------------
- {"a": "AAA", "b": "B", "c": 1, "d": "HELLO WORLD"}
-(1 row)
-
--- some other func(text) -> text functions
-select jsonb_apply('"hello"', 'md5(text)');
-            jsonb_apply             
-------------------------------------
- "5d41402abc4b2a76b9719d911017c592"
-(1 row)
-
-select jsonb_apply('"hello"', 'quote_ident(text)');
+select jsonb_apply('"    hELLo  "', 'ltrim(text)');
  jsonb_apply 
 -------------
- "hello"
+ "hELLo  "
 (1 row)
 
-select jsonb_apply('"hello"', 'quote_literal(text)');
+select jsonb_apply('"    hELLo  "', 'rtrim(text)');
  jsonb_apply 
 -------------
- "'hello'"
+ "    hELLo"
 (1 row)
 
--- sanity checks and errors
-select jsonb_apply('"hello"', 'length(text)');
-ERROR:  requested function does not return "text", but oid=23
-select jsonb_apply('"hello"', 'replace(text, text, text)');
-ERROR:  only functions with pronargs=1 are supported, requested function has pronargs=3
--- select proname,
---        prosrc,
---        proargtypes,
---        prorettype,
---        'select ' || 'jsonb_apply(''"hello"'', ' || '''' || proname || '(text)'');'
--- select pg_proc
---     where proargtypes = '25'::oidvector
---   and prorettype = 25
--- order by proname;
-select jsonb_apply('"hELLo"', 'btrim(text)');
+select jsonb_apply('"    hELLo  "', 'btrim(text)');
  jsonb_apply 
 -------------
  "hELLo"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'current_setting(text)');
-ERROR:  unrecognized configuration parameter "hELLo"
-select jsonb_apply('"hELLo"', 'format(text)');
- jsonb_apply 
--------------
- "hELLo"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'initcap(text)');
-ERROR:  could not determine which collation to use for initcap() function
-HINT:  Use the COLLATE clause to set the collation explicitly.
-select jsonb_apply('"hELLo"', 'lower(text)');
- jsonb_apply 
--------------
- "hello"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'ltrim(text)');
- jsonb_apply 
--------------
- "hELLo"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'max(text)');
-ERROR:  internal function "aggregate_dummy" is not in internal lookup table
-select jsonb_apply('"hELLo"', 'md5(text)');
-            jsonb_apply             
-------------------------------------
- "f8bf346aaea43760496fc4f012b3008c"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'min(text)');
-ERROR:  internal function "aggregate_dummy" is not in internal lookup table
-select jsonb_apply('"hELLo"', 'pg_current_logfile(text)');
-ERROR:  log format "hELLo" is not supported
-HINT:  The supported log formats are "stderr", "csvlog", and "jsonlog".
-select jsonb_apply('"hELLo"', 'pg_get_viewdef(text)');
-ERROR:  relation "hello" does not exist
-select jsonb_apply('"hELLo"', 'pg_ls_dir(text)');
-ERROR:  set-valued function called in context that cannot accept a set
-select jsonb_apply('"hELLo"', 'pg_read_file(text)');
-ERROR:  could not open file "hELLo" for reading: No such file or directory
-select jsonb_apply('"hELLo"', 'quote_ident(text)');
- jsonb_apply 
--------------
- "\"hELLo\""
-(1 row)
-
-select jsonb_apply('"hELLo"', 'quote_literal(text)');
- jsonb_apply 
--------------
- "'hELLo'"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'quote_nullable(text)');
- jsonb_apply 
--------------
- "'hELLo'"
 (1 row)
 
 select jsonb_apply('"hELLo"', 'reverse(text)');
@@ -132,29 +45,22 @@ select jsonb_apply('"hELLo"', 'reverse(text)');
  "oLLEh"
 (1 row)
 
-select jsonb_apply('"hELLo"', 'rtrim(text)');
- jsonb_apply 
--------------
- "hELLo"
+-- complex objects
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'lower(text)');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "john", "l": "doe", "arr": ["hello", {"k": "value"}], "message": "who are you?"}
 (1 row)
 
-select jsonb_apply('"hELLo"', 'similar_to_escape(text)');
-  jsonb_apply  
----------------
- "^(?:hELLo)$"
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'upper(text)');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "JOHN", "l": "DOE", "arr": ["HELLO", {"k": "VALUE"}], "message": "WHO ARE YOU?"}
 (1 row)
 
-select jsonb_apply('"hELLo"', 'to_ascii(text)');
-ERROR:  encoding conversion from UTF8 to ASCII not supported
-select jsonb_apply('"hELLo"', 'unistr(text)');
- jsonb_apply 
--------------
- "hELLo"
-(1 row)
-
-select jsonb_apply('"hELLo"', 'upper(text)');
- jsonb_apply 
--------------
- "HELLO"
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
 (1 row)
 

@@ -47,21 +47,34 @@ apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     JsonbApplyState *state = (JsonbApplyState *) _state;
     Oid funcoid = state->funcoid;
     Oid collation = state->top_fcinfo->fncollation;
-    Datum arg1, result;
+    Datum func_result;
+    text *result;
 
 //    elog(INFO, "collid=%u, funcoid=%u", state->top_fcinfo->fncollation, state->funcoid);
 
     if (funcoid == 870) {
-        result = CStringGetTextDatum(str_tolower(elem_value, elem_len, collation));
+        result = cstring_to_text(str_tolower(elem_value, elem_len, collation));
     } else if (funcoid == 871) {
-        result = CStringGetTextDatum(str_toupper(elem_value, elem_len, collation));
+        result = cstring_to_text(str_toupper(elem_value, elem_len, collation));
 
     } else {
-        arg1 = PointerGetDatum(cstring_to_text(elem_value));
-        result = OidFunctionCall1(state->funcoid, arg1);
+
+        /* Can't figure out why some funcs need a copy. So making them all use copy. */
+        char *elemcopy = (char *) malloc(elem_len + 1);
+        if (elemcopy != NULL) {
+            memcpy(elemcopy, elem_value, elem_len);
+            elemcopy[elem_len] = '\0';
+        }
+
+        func_result = OidFunctionCall1(funcoid, CStringGetTextDatum(elemcopy));
+        result = DatumGetTextPP(func_result);
+
+        free(elemcopy);
+
+
     }
 
-    return DatumGetTextPP(result);
+    return result;
 }
 
 
@@ -109,7 +122,6 @@ jsonb_apply(PG_FUNCTION_ARGS) {
     if (!HeapTupleIsValid(tuple))
         elog(ERROR, "cache lookup failed for function %u", state->funcoid);
     state->procStruct = (Form_pg_proc) GETSTRUCT(tuple);
-
 
 
     printf("proname=%s\tpronargs=%d\tprorettype=%d\n",
