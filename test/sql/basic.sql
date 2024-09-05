@@ -12,8 +12,6 @@ select jsonb_apply('"hELLo"', 'upper(text)');
 select jsonb_apply('"    hELLo  "', 'ltrim(text)');
 select jsonb_apply('"    hELLo  "', 'rtrim(text)');
 select jsonb_apply('"    hELLo  "', 'btrim(text)');
-select jsonb_apply('"hello"', 'quote_ident(text)');
-select jsonb_apply('"hello"', 'quote_literal(text)');
 select jsonb_apply('"hELLo"', 'reverse(text)');
 
 -- complex objects

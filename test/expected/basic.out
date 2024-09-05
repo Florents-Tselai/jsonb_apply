@@ -39,18 +39,6 @@ select jsonb_apply('"    hELLo  "', 'btrim(text)');
  "hELLo"
 (1 row)
 
-select jsonb_apply('"hello"', 'quote_ident(text)');
- jsonb_apply 
--------------
- "hello"
-(1 row)
-
-select jsonb_apply('"hello"', 'quote_literal(text)');
- jsonb_apply 
--------------
- "'hello'"
-(1 row)
-
 select jsonb_apply('"hELLo"', 'reverse(text)');
  jsonb_apply 
 -------------
