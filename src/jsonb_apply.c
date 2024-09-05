@@ -152,6 +152,7 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
     HeapTuple tuple;
     Datum funcregproc;
     Form_pg_proc funcform; /* corresponds to a pointer to a tuple with the format of pg_proc relation. */
+    Datum *funcargs;
 
     /* Search for the function in the catalog */
     if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
@@ -171,21 +172,31 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
     funcform = (Form_pg_proc) GETSTRUCT(tuple);
     ReleaseSysCache(tuple);
 
-    /* Now that we have found our function we can perform some sanity checks */
-    if ((funcform->pronargs != nargs - 1))
-        elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(funcform->proname),
-             funcform->pronargs, nargs - 2);
+    {
+        printf("variadic: proname=%s\tpronargs=%d\tprorettype=%d\n",
+               NameStr(funcform->proname),
+               funcform->pronargs,
+               funcform->prorettype
+        );
+    }
 
-    if (funcform->prorettype != TEXTOID)
-        elog(ERROR, "function %s does not return text", NameStr(funcform->proname));
+    /* Sanity checks  */
+    {
+        if ((funcform->pronargs != nargs - 1))
+            elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(funcform->proname),
+                 funcform->pronargs, nargs - 2);
 
+        if (funcform->prorettype != TEXTOID)
+            elog(ERROR, "function %s does not return text", NameStr(funcform->proname));
+    }
 
-    printf("variadic: proname=%s\tpronargs=%d\tprorettype=%d\n",
-           NameStr(funcform->proname),
-           funcform->pronargs,
-           funcform->prorettype
-    );
+    funcargs = palloc0(sizeof(Datum) * funcform->pronargs);
+    for (int i = 0; i < funcform->pronargs; i++) {
+        int idx_args = (i == 0) ? i : i + 1;
+        funcargs[i] = args[idx_args];
+    }
 
+    pfree(funcargs);
     PG_RETURN_DATUM(DirectFunctionCall1(jsonb_in, CStringGetDatum("\"bye world\"")));
 }
 
