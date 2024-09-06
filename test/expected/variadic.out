@@ -4,3 +4,15 @@ select jsonb_apply_variadic('"hello world"', 'replace(text, text, text)', '"hell
  "bye world"
 (1 row)
 
+select jsonb_apply_variadic('"Pg"', 'repeat(text, integer)', 2);
+ jsonb_apply_variadic 
+----------------------
+ "bye world"
+(1 row)
+
+select jsonb_apply_variadic('"abc~@~def~@~ghi"', 'split_part(text,text,integer)', '~@~', 2);
+ jsonb_apply_variadic 
+----------------------
+ "bye world"
+(1 row)
+
