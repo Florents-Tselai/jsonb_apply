@@ -50,6 +50,7 @@ typedef struct JsonbApplyState {
     Form_pg_proc procStruct; /*  */
     Datum *funcargs1_n; /* arg0 is the json value itself, additional are supplied by the user. */
     Oid *funcargs1_n_types;
+    Oid fncollation;
     Func *f;
 
 } JsonbApplyState;
@@ -93,7 +94,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     JsonbApplyState *state = (JsonbApplyState *) _state;
     Func *f = state->f;
     Oid foid = state->f->proc;
-    Oid collation = state->top_fcinfo->fncollation;
+    Oid collation = state->fncollation;
 
     int f_nargs = f->form->pronargs;
     PGFunction fn = f->finfo->fn_addr;
@@ -244,7 +245,7 @@ jsonb_apply(PG_FUNCTION_ARGS) {
 
 
 Datum
-jsonb_apply_worker(FunctionCallInfo fcinfo, int nargs, const Datum *args, const bool *nulls, const Oid *types) {
+jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types, Oid collation) {
     Jsonb *jb = DatumGetJsonbP(args[0]);
     char *funcdef = text_to_cstring(DatumGetTextPP(args[1]));
     Datum result;
@@ -322,15 +323,13 @@ jsonb_apply_worker(FunctionCallInfo fcinfo, int nargs, const Datum *args, const 
 
     /* fill in transformation state */
     JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
-    state->top_fcinfo = fcinfo;
     state->f = f;
     state->funcargs1_n = funcargs1_n;
     state->funcargs1_n_types = funcargs1_n_types;
+    state->fncollation = collation;
     JsonTransformStringValuesAction action = (JsonTransformStringValuesAction) variadic_apply_func_jsonb_value;
 
     out = transform_jsonb_string_values(jb, state, action);
-
-//    result = DirectFunctionCall1(jsonb_in, CStringGetDatum("\"bye world\""));
 
     /* Cleanup */
     if (funcargs1_n)
@@ -362,5 +361,5 @@ jsonb_apply_variadic(PG_FUNCTION_ARGS) {
     if (nargs < 0)
         PG_RETURN_NULL();
 
-    PG_RETURN_DATUM(jsonb_apply_worker(fcinfo, nargs, args, nulls, types));
+    PG_RETURN_DATUM(jsonb_apply_worker(nargs, args, nulls, types, fcinfo->fncollation));
 }
