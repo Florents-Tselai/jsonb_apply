@@ -32,8 +32,6 @@ _PG_init(void) {
 void _PG_fini(void) {
 }
 
-typedef struct Callable {
-} Callable;
 
 typedef struct JsonbApplyState {
     FunctionCallInfo top_fcinfo; /* fcinfo from top jsonb_apply(PG_FUNCTION_ARGS)*/
@@ -142,6 +140,21 @@ jsonb_apply(PG_FUNCTION_ARGS) {
     PG_RETURN_JSONB_P(out);
 }
 
+/* A struct to pass around as a "callable"
+ * gf
+ */
+typedef struct Func {
+    text *indef; /* As provided by the user */
+
+    Datum proc; /* proc OID */
+    FmgrInfo *finfo;
+    Form_pg_proc form; /* corresponds to a pointer to a tuple with the format of pg_proc relation. */
+
+} Func;
+
+#define FUNC_OID(f) (DatumGetObjectId((f)->proc))
+
+
 Datum
 jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types) {
     Jsonb *jb = DatumGetJsonbP(args[0]);
@@ -149,16 +162,18 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
     Datum result;
 
     HeapTuple tuple;
-    Datum funcregproc;
-    Form_pg_proc funcform; /* corresponds to a pointer to a tuple with the format of pg_proc relation. */
+
+    Func *f = palloc0(sizeof(Func));
     Datum *funcargs1_n;
 
-    /* Search for the function in the catalog */
+
+    /* Search for the function in the catalog and fill-in the Func struct */
     {
+        f->indef = DatumGetTextPP(args[1]);
         if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
                                          InvalidOid, -1,
                                          NULL,
-                                         &funcregproc))
+                                         &f->proc))
 
             ereport(ERROR,
                     (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -166,53 +181,60 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
 
 
         /* Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation) */
-        tuple = SearchSysCache1(PROCOID, funcregproc);
+        tuple = SearchSysCache1(PROCOID, f->proc);
         if (!HeapTupleIsValid(tuple))
-            elog(ERROR, "cache lookup failed for function %u", DatumGetObjectId(funcregproc));
-        funcform = (Form_pg_proc) GETSTRUCT(tuple);
+            elog(ERROR, "cache lookup failed for function %u", FUNC_OID(f));
+        f->form = (Form_pg_proc) GETSTRUCT(tuple);
         ReleaseSysCache(tuple);
+
+        f->finfo = palloc0(sizeof(FmgrInfo));
+        fmgr_info(FUNC_OID(f), f->finfo);
 
     }
 
     /* debug/inspect the function we found */
     {
         printf("variadic: proname=%s\tpronargs=%d\tprorettype=%d\n",
-               NameStr(funcform->proname),
-               funcform->pronargs,
-               funcform->prorettype
+               NameStr(f->form->proname),
+               f->form->pronargs,
+               f->form->prorettype
         );
     }
 
     /* Sanity checks  */
     {
-        if (funcform->pronargs < 1)
-            elog(ERROR, "function %s does not accept any argument", NameStr(funcform->proname));
+        if (f->form->pronargs < 1)
+            elog(ERROR, "function %s does not accept any argument", NameStr(f->form->proname));
 
-        if (funcform->pronargs != nargs - 1)
-            elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(funcform->proname),
-                 funcform->pronargs, nargs - 2);
+        if (f->form->pronargs != nargs - 1)
+            elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(f->form->proname),
+                 f->form->pronargs, nargs - 2);
 
-        if (funcform->prorettype != TEXTOID)
-            elog(ERROR, "function %s does not return text", NameStr(funcform->proname));
+        if (f->form->prorettype != TEXTOID)
+            elog(ERROR, "function %s does not return text", NameStr(f->form->proname));
     }
 
     /* Fill-in the Datum *funcargs1_n. Arguments to call the function with */
     {
-        if (funcform->pronargs == 1) {
+        if (f->form->pronargs == 1) {
             funcargs1_n = NULL;
         } else {
-            funcargs1_n = palloc0(sizeof(Datum) * funcform->pronargs - 1);
-            for (int i = 0; i < funcform->pronargs - 1; i++) {
+            funcargs1_n = palloc0(sizeof(Datum) * f->form->pronargs - 1);
+            for (int i = 0; i < f->form->pronargs - 1; i++) {
                 funcargs1_n[i] = args[i + 2];
             }
         }
     }
 
+    result = DirectFunctionCall1(jsonb_in, CStringGetDatum("\"bye world\""));
     /* Cleanup */
     if (funcargs1_n)
         pfree(funcargs1_n);
 
-    PG_RETURN_DATUM(DirectFunctionCall1(jsonb_in, CStringGetDatum("\"bye world\"")));
+    pfree(f->finfo);
+    pfree(f);
+
+    PG_RETURN_DATUM(result);
 }
 
 PG_FUNCTION_INFO_V1(jsonb_apply_variadic);
