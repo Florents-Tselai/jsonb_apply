@@ -1,24 +1,33 @@
--- func passed without args
-select jsonb_apply('{}', 'updfgdper');
-ERROR:  expected a left parenthesis
-select jsonb_apply('{}', 'updfgdper()');
-ERROR:  function "updfgdper()" does not exist
--- sanity checks and errors for functions with not-suport nargs or rettype
+-- error messages
 select jsonb_apply('"hello"', 'length(text)');
-ERROR:  requested function does not return "text", but oid=23
-select jsonb_apply('"hello"', 'replace(text, text, text)');
-ERROR:  only functions with pronargs=1 are supported, requested function has pronargs=3
--- basic transformation functions not relying on encoding (e.g. md5 does)
-select jsonb_apply('"hELLo"', 'lower(text)');
+ERROR:  function length does not return text
+select jsonb_apply('"hello"', 'gsdgfd(text, text)');
+ERROR:  function "gsdgfd(text, text)" does not exist
+create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
+-- funcs with nargs=0
+select jsonb_apply('"hello"', 'lorem()');
+  jsonb_apply  
+---------------
+ "lorem ipsum"
+(1 row)
+
+-- funcs with nargs=1
+select jsonb_apply('"hello"', 'lower(text)');
  jsonb_apply 
 -------------
  "hello"
 (1 row)
 
-select jsonb_apply('"hELLo"', 'upper(text)');
+select jsonb_apply('"hello"', 'upper(text)');
  jsonb_apply 
 -------------
  "HELLO"
+(1 row)
+
+select jsonb_apply('"hello"', 'reverse(text)');
+ jsonb_apply 
+-------------
+ "olleh"
 (1 row)
 
 select jsonb_apply('"    hELLo  "', 'ltrim(text)');
@@ -39,13 +48,26 @@ select jsonb_apply('"    hELLo  "', 'btrim(text)');
  "hELLo"
 (1 row)
 
-select jsonb_apply('"hELLo"', 'reverse(text)');
+-- funcs with combination of argtypes
+select jsonb_apply('"hello world"', 'replace(text, text, text)', 'hello', 'bye');
  jsonb_apply 
 -------------
- "oLLEh"
+ "bye world"
 (1 row)
 
--- complex objects
+select jsonb_apply('"Pg"', 'repeat(text, integer)', 3);
+ jsonb_apply 
+-------------
+ "PgPgPg"
+(1 row)
+
+select jsonb_apply('"abc~@~def~@~ghi"', 'split_part(text,text,integer)', '~@~', 2);
+ jsonb_apply 
+-------------
+ "def"
+(1 row)
+
+-- complex object, just checking for spurious pointers.
 select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'lower(text)');
                                       jsonb_apply                                       
 ----------------------------------------------------------------------------------------

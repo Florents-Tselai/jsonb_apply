@@ -1,7 +1,7 @@
 # jsonb_apply: Functional json in Postgres
 [![build](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml/badge.svg)](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml)
 
-Have you ever wanted to recrusively apply a function to a `jsonb` object?
+Have you ever wanted to recursively apply a function to a `jsonb` object?
 Like this 
 ```tsql
 select jsonb_apply(jsonb, func);
@@ -9,6 +9,10 @@ select jsonb_apply(jsonb, func);
 No? Well, here's a Postgres extension that allows you to do just that:
 
 ## Usage
+
+```tsql
+select jsonb_apply(doc jsonb, func text[, variadic "any" args1_n]);
+```
 
 Currently supports `func(text)->text` functions applied recursively to string values or elements in `jsonb`.
 ```tsql
