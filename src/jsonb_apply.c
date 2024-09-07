@@ -10,7 +10,7 @@
 #include "utils/regproc.h"
 #include "utils/syscache.h"
 #include "access/htup_details.h"
-
+#include "parser/parse_func.h"
 #if PG_VERSION_NUM >= 160000
 
 #include "varatt.h"
@@ -46,12 +46,12 @@ typedef struct Func {
 typedef struct JsonbApplyState {
     FunctionCallInfo top_fcinfo; /* fcinfo from top jsonb_apply(PG_FUNCTION_ARGS)*/
     Datum funcregproc; /* the fucnregproc to be applied */
+    int nargs;
     Form_pg_proc procStruct; /*  */
-    Datum *funcargs1_n; /* arg0 is the json value itself, additional are supplied by the user. */
-    Oid *funcargs1_n_types;
+    const Datum *funcargs1_n; /* arg0 is the json value itself, additional are supplied by the user. */
+    const Oid *funcargs1_n_types;
     Oid fncollation;
     Func *f;
-
 } JsonbApplyState;
 
 #define FUNC_OID(f) (DatumGetObjectId((f)->proc))
@@ -119,50 +119,62 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
         default:
             ereport(ERROR,
                     (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                            errmsg("functions with more than 9 arguments are not supported")));
+                        errmsg("functions with more than 9 arguments are not supported")));
     }
 
     return DatumGetTextPP(result);;
-
 }
 
 
 static Datum
-jsonb_apply_worker(Jsonb *jb, char *funcdef, int nvarargs, const Datum *varargs, const bool *varnulls, const Oid *vartypes, Oid collation) {
-
-    Jsonb *out;
-
+jsonb_apply_worker(Jsonb *jb, text *funcdef,
+                   int nargs,
+                   bool withvarargs, int nvarargs,
+                   const Datum *varargs, const bool *varnulls,
+                   const Oid *vartypes, Oid collation) {
     HeapTuple tuple;
 
     Func *f = palloc0(sizeof(Func));
-    Datum *funcargs1_n = NULL;
-    Oid *funcargs1_n_types = NULL;
+    f->indef = funcdef;
 
+    JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
+
+    state->f = f;
+    state->nargs = nargs;
+    state->fncollation = collation;
+
+    /* without varargs */
+    if (!withvarargs) {
+        state->funcargs1_n = NULL;
+        state->funcargs1_n_types = NULL;
+        /* withvarargs */
+    } else {
+        state->funcargs1_n = varargs;
+        state->funcargs1_n_types = vartypes;
+    }
 
     /* Search for the function in the catalog and fill-in the Func struct */
-    {
-        f->indef = DatumGetTextPP(varargs[1]);
-        if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
-                                         InvalidOid, -1,
-                                         NULL,
-                                         &f->proc))
 
-            ereport(ERROR,
-                    (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                            errmsg("Invalid function name: %s", funcdef)));
+    if (!DirectInputFunctionCallSafe(regprocedurein, text_to_cstring(funcdef),
+                                     InvalidOid, -1,
+                                     NULL,
+                                     &f->proc))
+
+        ereport(ERROR,
+            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                errmsg("Invalid function name: %s", text_to_cstring(funcdef))));
 
 
-        /* Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation) */
-        tuple = SearchSysCache1(PROCOID, f->proc);
-        if (!HeapTupleIsValid(tuple))
-            elog(ERROR, "cache lookup failed for function %u", FUNC_OID(f));
-        f->form = (Form_pg_proc) GETSTRUCT(tuple);
-        ReleaseSysCache(tuple);
+    /* Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation) */
+    tuple = SearchSysCache1(PROCOID, f->proc);
+    if (!HeapTupleIsValid(tuple))
+        elog(ERROR, "cache lookup failed for function %u", FUNC_OID(f));
+    f->form = (Form_pg_proc) GETSTRUCT(tuple);
+    ReleaseSysCache(tuple);
 
-        f->finfo = palloc0(sizeof(FmgrInfo));
-        fmgr_info(FUNC_OID(f), f->finfo);
+    f->finfo = palloc0(sizeof(FmgrInfo));
+    fmgr_info(FUNC_OID(f), f->finfo);
 
-    }
 
     /* debug/inspect the function we found */
     {
@@ -179,44 +191,13 @@ jsonb_apply_worker(Jsonb *jb, char *funcdef, int nvarargs, const Datum *varargs,
             elog(ERROR, "function %s does not return text", NameStr(f->form->proname));
     }
 
-    /* Fill-in the Datum *funcargs1_n. Arguments to call the function with */
-    {
-        if (f->form->pronargs <= 1) {
-            funcargs1_n = NULL;
-            funcargs1_n_types = NULL;
-        } else {
-            /*TODO: use pointer arithmetic for this */
-            funcargs1_n = palloc0(sizeof(Datum) * nvarargs);
-            funcargs1_n_types = palloc0(sizeof(Oid) * nvarargs);
-
-            for (int i = 0; i < nvarargs - 1; i++) {
-                funcargs1_n[i] = varargs[i];
-                funcargs1_n_types[i] = vartypes[i];
-            }
-        }
-    }
-
-    /* fill in transformation state */
-    JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
-    state->f = f;
-    state->funcargs1_n = funcargs1_n;
-    state->funcargs1_n_types = funcargs1_n_types;
-    state->fncollation = collation;
     JsonTransformStringValuesAction action = (JsonTransformStringValuesAction) variadic_apply_func_jsonb_value;
 
-    out = transform_jsonb_string_values(jb, state, action);
-
-    /* Cleanup */
-    if (funcargs1_n)
-        pfree(funcargs1_n);
-
-    if (funcargs1_n_types)
-        pfree(funcargs1_n_types);
+    Jsonb *out = transform_jsonb_string_values(jb, state, action);
 
     pfree(state);
     pfree(f->finfo);
     pfree(f);
-
 
     PG_RETURN_JSONB_P(out);
 }
@@ -226,17 +207,19 @@ PG_FUNCTION_INFO_V1(jsonb_apply);
 Datum
 jsonb_apply(PG_FUNCTION_ARGS) {
     Jsonb *jb = PG_GETARG_JSONB_P(0);
-    char *funcdef = text_to_cstring(PG_GETARG_TEXT_PP(1));
+    text *funcdef = PG_GETARG_TEXT_PP(1);
+
     Datum *varargs;
     bool *varnulls;
     Oid *vartypes;
 
     /* build argument values to build the object */
-    int nvarargs = extract_variadic_args(fcinfo, 0, true,
+    int nvarargs = extract_variadic_args(fcinfo, 2, true,
                                          &varargs, &vartypes, &varnulls);
 
-    if (nvarargs < 0)
-        PG_RETURN_NULL();
+    bool withvarargs = (nvarargs == -1) ? false : true;
 
-    PG_RETURN_DATUM(jsonb_apply_worker(jb, funcdef, nvarargs, varargs, varnulls, vartypes, fcinfo->fncollation));
+    PG_RETURN_DATUM(
+        jsonb_apply_worker(jb, funcdef, PG_NARGS(), withvarargs, nvarargs, varargs, varnulls, vartypes, fcinfo->
+            fncollation));
 }
