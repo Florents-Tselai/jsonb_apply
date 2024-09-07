@@ -35,7 +35,7 @@ void _PG_fini(void) {
 
 /* A struct to pass around as a "callable" */
 typedef struct Func {
-    text *indef; /* As provided by the user */
+    // text *indef; /* As provided by the user */
 
     Datum proc; /* proc OID */
     FmgrInfo *finfo;
@@ -65,9 +65,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
 
     int f_nargs = f->form->pronargs;
     PGFunction fn = f->finfo->fn_addr;
-    Datum arg0;
-    CStringGetTextDatum(elem_value);
-    Datum *args1_n = state->funcargs1_n;
+    const Datum *args1_n = state->funcargs1_n;
 
     Datum result;
 
@@ -78,7 +76,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
         elemcopy[elem_len] = '\0';
     }
 
-    arg0 = CStringGetTextDatum(elemcopy);
+    Datum arg0 = CStringGetTextDatum(elemcopy);
 
     switch (f_nargs) {
         case 0:
@@ -135,7 +133,7 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
     HeapTuple tuple;
 
     Func *f = palloc0(sizeof(Func));
-    f->indef = funcdef;
+    // f->indef = funcdef;
 
     JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
 
