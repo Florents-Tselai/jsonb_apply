@@ -128,9 +128,8 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
 
 
 static Datum
-jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types, Oid collation) {
-    Jsonb *jb = DatumGetJsonbP(args[0]);
-    char *funcdef = text_to_cstring(DatumGetTextPP(args[1]));
+jsonb_apply_worker(Jsonb *jb, char *funcdef, int nvarargs, const Datum *varargs, const bool *varnulls, const Oid *vartypes, Oid collation) {
+
     Jsonb *out;
 
     HeapTuple tuple;
@@ -142,7 +141,7 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
 
     /* Search for the function in the catalog and fill-in the Func struct */
     {
-        f->indef = DatumGetTextPP(args[1]);
+        f->indef = DatumGetTextPP(varargs[1]);
         if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
                                          InvalidOid, -1,
                                          NULL,
@@ -187,12 +186,12 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
             funcargs1_n_types = NULL;
         } else {
             /*TODO: use pointer arithmetic for this */
-            funcargs1_n = palloc0(sizeof(Datum) * f->form->pronargs - 1);
-            funcargs1_n_types = palloc0(sizeof(Oid) * f->form->pronargs - 1);
+            funcargs1_n = palloc0(sizeof(Datum) * nvarargs);
+            funcargs1_n_types = palloc0(sizeof(Oid) * nvarargs);
 
-            for (int i = 0; i < f->form->pronargs - 1; i++) {
-                funcargs1_n[i] = args[i + 2];
-                funcargs1_n_types[i] = types[i + 2];
+            for (int i = 0; i < nvarargs - 1; i++) {
+                funcargs1_n[i] = varargs[i];
+                funcargs1_n_types[i] = vartypes[i];
             }
         }
     }
@@ -226,16 +225,18 @@ PG_FUNCTION_INFO_V1(jsonb_apply);
 
 Datum
 jsonb_apply(PG_FUNCTION_ARGS) {
-    Datum *args;
-    bool *nulls;
-    Oid *types;
+    Jsonb *jb = PG_GETARG_JSONB_P(0);
+    char *funcdef = text_to_cstring(PG_GETARG_TEXT_PP(1));
+    Datum *varargs;
+    bool *varnulls;
+    Oid *vartypes;
 
     /* build argument values to build the object */
-    int nargs = extract_variadic_args(fcinfo, 0, true,
-                                      &args, &types, &nulls);
+    int nvarargs = extract_variadic_args(fcinfo, 0, true,
+                                         &varargs, &vartypes, &varnulls);
 
-    if (nargs < 0)
+    if (nvarargs < 0)
         PG_RETURN_NULL();
 
-    PG_RETURN_DATUM(jsonb_apply_worker(nargs, args, nulls, types, fcinfo->fncollation));
+    PG_RETURN_DATUM(jsonb_apply_worker(jb, funcdef, nvarargs, varargs, varnulls, vartypes, fcinfo->fncollation));
 }
