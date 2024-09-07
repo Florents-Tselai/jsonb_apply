@@ -5,37 +5,37 @@ select jsonb_apply_variadic('"hello"', 'lorem()');
  "lorem ipsum"
 (1 row)
 
-select jsonb_apply_variadic('"hello"', 'lower(text)', NULL);
+select jsonb_apply_variadic('"hello"', 'lower(text)');
  jsonb_apply_variadic 
 ----------------------
  "hello"
 (1 row)
 
-select jsonb_apply_variadic('"hello"', 'upper(text)', NULL);
+select jsonb_apply_variadic('"hello"', 'upper(text)');
  jsonb_apply_variadic 
 ----------------------
  "HELLO"
 (1 row)
 
-select jsonb_apply_variadic('"hello"', 'reverse(text)', NULL);
+select jsonb_apply_variadic('"hello"', 'reverse(text)');
  jsonb_apply_variadic 
 ----------------------
  "olleh"
 (1 row)
 
-select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'lower(text)', NULL);
+select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'lower(text)');
                                   jsonb_apply_variadic                                  
 ----------------------------------------------------------------------------------------
  {"f": "john", "l": "doe", "arr": ["hello", {"k": "value"}], "message": "who are you?"}
 (1 row)
 
-select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'upper(text)', NULL);
+select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'upper(text)');
                                   jsonb_apply_variadic                                  
 ----------------------------------------------------------------------------------------
  {"f": "JOHN", "l": "DOE", "arr": ["HELLO", {"k": "VALUE"}], "message": "WHO ARE YOU?"}
 (1 row)
 
-select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)', NULL);
+select jsonb_apply_variadic('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse(text)');
                                   jsonb_apply_variadic                                  
 ----------------------------------------------------------------------------------------
  {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
