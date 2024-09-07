@@ -46,7 +46,7 @@ typedef struct Func {
 typedef struct JsonbApplyState {
     FunctionCallInfo top_fcinfo; /* fcinfo from top jsonb_apply(PG_FUNCTION_ARGS)*/
     Datum funcregproc; /* the fucnregproc to be applied */
-    int nargs;
+    // int nargs;
     Form_pg_proc procStruct; /*  */
     const Datum *funcargs1_n; /* arg0 is the json value itself, additional are supplied by the user. */
     const Oid *funcargs1_n_types;
@@ -140,7 +140,7 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
     JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
 
     state->f = f;
-    state->nargs = nargs;
+    // state->nargs = nargs;
     state->fncollation = collation;
 
     /* without varargs */
