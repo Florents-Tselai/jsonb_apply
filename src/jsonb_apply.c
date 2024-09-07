@@ -86,92 +86,6 @@ apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     return result;
 }
 
-#define PROC_LOWER_OID 870
-#define PROC_UPPER_OID 871
-
-static text *
-variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
-    JsonbApplyState *state = (JsonbApplyState *) _state;
-    Func *f = state->f;
-    Oid foid = state->f->proc;
-    Oid collation = state->fncollation;
-
-    int f_nargs = f->form->pronargs;
-    PGFunction fn = f->finfo->fn_addr;
-    Datum arg0;
-    CStringGetTextDatum(elem_value);
-    Datum *args1_n = state->funcargs1_n;
-    Oid *args1_n_types = state->funcargs1_n_types;
-
-    Datum result;
-
-    /* Can't figure out why some funcs need a copy. So making them all use copy. */
-    char *elemcopy = (char *) malloc(elem_len + 1);
-    if (elemcopy != NULL) {
-        memcpy(elemcopy, elem_value, elem_len);
-        elemcopy[elem_len] = '\0';
-    }
-
-    arg0 = CStringGetTextDatum(elemcopy);
-
-
-    //        printf("f_nargs=1\telem_value=%s\n", text_to_cstring(DatumGetTextPP(arg0)));
-
-    switch (f_nargs) {
-        case 1:
-            result = DirectFunctionCall1Coll(fn, collation, arg0);
-            break;
-        case 2:
-            result = DirectFunctionCall2Coll(fn, collation, arg0, args1_n[0]);
-            break;
-        case 3:
-            result = DirectFunctionCall3Coll(fn, collation, arg0, args1_n[0], args1_n[1]);
-            break;
-        case 4:
-            result = DirectFunctionCall4Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2]);
-            break;
-        case 5:
-            result = DirectFunctionCall5Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
-                                             args1_n[3]);
-            break;
-        case 6:
-            result = DirectFunctionCall6Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
-                                             args1_n[3], args1_n[4]);
-            break;
-        case 7:
-            result = DirectFunctionCall7Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
-                                             args1_n[3], args1_n[4], args1_n[5]);
-            break;
-        case 8:
-            result = DirectFunctionCall8Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
-                                             args1_n[3], args1_n[4], args1_n[5], args1_n[6]);
-            break;
-        case 9:
-            result = DirectFunctionCall9Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
-                                             args1_n[3], args1_n[4], args1_n[5], args1_n[6], args1_n[7]);
-            break;
-        default:
-            result = CStringGetTextDatum("INVALID");
-            break;
-    }
-
-
-
-//    if (f_nargs == 1) {
-//        result = DirectFunctionCall1Coll(f->finfo->fn_addr, collation, arg0);
-//    } else if (f_nargs == 2) {
-//        result = OidFunctionCall2(foid, arg0, args1_n[0]);
-//    } else if (f_nargs == 3) {
-//        result = DirectFunctionCall3Coll(f->finfo->fn_addr, collation, arg0, args1_n[0], args1_n[1]);
-//    } else {
-//        return cstring_to_text("INVALID");
-//    }
-
-    return DatumGetTextPP(result);;
-
-
-}
-
 
 PG_FUNCTION_INFO_V1(jsonb_apply);
 
@@ -244,6 +158,79 @@ jsonb_apply(PG_FUNCTION_ARGS) {
 #define FUNC_OID(f) (DatumGetObjectId((f)->proc))
 
 
+static text *
+variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
+    JsonbApplyState *state = (JsonbApplyState *) _state;
+    Func *f = state->f;
+    Oid foid = state->f->proc;
+    Oid collation = state->fncollation;
+
+    int f_nargs = f->form->pronargs;
+    PGFunction fn = f->finfo->fn_addr;
+    Datum arg0;
+    CStringGetTextDatum(elem_value);
+    Datum *args1_n = state->funcargs1_n;
+    Oid *args1_n_types = state->funcargs1_n_types;
+
+    Datum result;
+
+    /* Can't figure out why some funcs need a copy. So making them all use copy. */
+    char *elemcopy = (char *) malloc(elem_len + 1);
+    if (elemcopy != NULL) {
+        memcpy(elemcopy, elem_value, elem_len);
+        elemcopy[elem_len] = '\0';
+    }
+
+    arg0 = CStringGetTextDatum(elemcopy);
+
+    switch (f_nargs) {
+        case 0:
+            /* DirectFunctionCall0Coll */
+            result = FunctionCall0Coll(f->finfo, collation);
+            break;
+        case 1:
+            result = DirectFunctionCall1Coll(fn, collation, arg0);
+            break;
+        case 2:
+            result = DirectFunctionCall2Coll(fn, collation, arg0, args1_n[0]);
+            break;
+        case 3:
+            result = DirectFunctionCall3Coll(fn, collation, arg0, args1_n[0], args1_n[1]);
+            break;
+        case 4:
+            result = DirectFunctionCall4Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2]);
+            break;
+        case 5:
+            result = DirectFunctionCall5Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
+                                             args1_n[3]);
+            break;
+        case 6:
+            result = DirectFunctionCall6Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
+                                             args1_n[3], args1_n[4]);
+            break;
+        case 7:
+            result = DirectFunctionCall7Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
+                                             args1_n[3], args1_n[4], args1_n[5]);
+            break;
+        case 8:
+            result = DirectFunctionCall8Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
+                                             args1_n[3], args1_n[4], args1_n[5], args1_n[6]);
+            break;
+        case 9:
+            result = DirectFunctionCall9Coll(fn, collation, arg0, args1_n[0], args1_n[1], args1_n[2],
+                                             args1_n[3], args1_n[4], args1_n[5], args1_n[6], args1_n[7]);
+            break;
+        default:
+            result = CStringGetTextDatum("INVALID");
+            break;
+    }
+
+    return DatumGetTextPP(result);;
+
+
+}
+
+
 Datum
 jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types, Oid collation) {
     Jsonb *jb = DatumGetJsonbP(args[0]);
@@ -294,8 +281,8 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
 
     /* Sanity checks  */
     {
-        if (f->form->pronargs < 1)
-            elog(ERROR, "function %s does not accept any argument", NameStr(f->form->proname));
+//        if (f->form->pronargs < 1)
+//            elog(ERROR, "function %s does not accept any argument", NameStr(f->form->proname));
 
 //        if (f->form->pronargs != nargs - 1)
 //            elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(f->form->proname),
@@ -307,7 +294,7 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
 
     /* Fill-in the Datum *funcargs1_n. Arguments to call the function with */
     {
-        if (f->form->pronargs == 1) {
+        if (f->form->pronargs <= 1) {
             funcargs1_n = NULL;
             funcargs1_n_types = NULL;
         } else {

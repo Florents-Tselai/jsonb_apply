@@ -1,3 +1,10 @@
+create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
+select jsonb_apply_variadic('"hello"', 'lorem()');
+ jsonb_apply_variadic 
+----------------------
+ "lorem ipsum"
+(1 row)
+
 select jsonb_apply_variadic('"hello"', 'lower(text)', NULL);
  jsonb_apply_variadic 
 ----------------------
