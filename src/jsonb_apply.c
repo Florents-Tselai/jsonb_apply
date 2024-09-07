@@ -33,8 +33,7 @@ void _PG_fini(void) {
 }
 
 
-/* A struct to pass around as a "callable"
- */
+/* A struct to pass around as a "callable" */
 typedef struct Func {
     text *indef; /* As provided by the user */
 
@@ -55,106 +54,6 @@ typedef struct JsonbApplyState {
 
 } JsonbApplyState;
 
-//static text *
-//apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
-//    JsonbApplyState *state = (JsonbApplyState *) _state;
-//    Oid funcoid = state->procStruct->oid;
-//    Oid collation = state->top_fcinfo->fncollation;
-//    Datum func_result;
-//    text *result;
-//
-//    //    elog(INFO, "collid=%u, funcoid=%u", state->top_fcinfo->fncollation, state->funcoid);
-//
-//    if (funcoid == 870) {
-//        result = cstring_to_text(str_tolower(elem_value, elem_len, collation));
-//    } else if (funcoid == 871) {
-//        result = cstring_to_text(str_toupper(elem_value, elem_len, collation));
-//    } else {
-//        /* Can't figure out why some funcs need a copy. So making them all use copy. */
-//        char *elemcopy = (char *) malloc(elem_len + 1);
-//        if (elemcopy != NULL) {
-//            memcpy(elemcopy, elem_value, elem_len);
-//            elemcopy[elem_len] = '\0';
-//        }
-//
-//        func_result = OidFunctionCall1(funcoid, CStringGetTextDatum(elemcopy));
-//        result = DatumGetTextPP(func_result);
-//
-//        free(elemcopy);
-//    }
-//
-//    return result;
-//}
-//
-//
-//PG_FUNCTION_INFO_V1(jsonb_apply);
-//
-//
-//Datum
-//jsonb_apply(PG_FUNCTION_ARGS) {
-//    /* Input */
-//    Jsonb *jb = PG_GETARG_JSONB_P(0);
-//    char *funcdef = text_to_cstring(PG_GETARG_TEXT_PP(1));
-//    HeapTuple tuple;
-//
-//    /* Output */
-//    Jsonb *out;
-//
-//    /* Action State */
-//    JsonTransformStringValuesAction action = (JsonTransformStringValuesAction) apply_func_jsonb_value;
-//    JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
-//    state->top_fcinfo = fcinfo;
-//
-//    /*
-//     * Search for the function in the system catalog,
-//     * by trying to create a `regprocedure` out of the `funcdef`
-//     * The implementation here is copied from to_regprocedure in postgres/.../regproc.c:
-//     * TODO: Call that instead directly
-//     * as DirectInputFunctionCallSafe is only available in PG 16, 17
-//     */
-//
-//    if (!DirectInputFunctionCallSafe(regprocedurein, funcdef,
-//                                     InvalidOid, -1,
-//                                     NULL,
-//                                     &state->funcregproc))
-//
-//        ereport(ERROR,
-//                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-//                        errmsg("Invalid function name: %s", funcdef)));
-//
-////    state->funcoid = DatumGetObjectId(state->funcregproc);
-//
-//    /*
-//     * Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation)
-//     */
-//    tuple = SearchSysCache1(PROCOID, DatumGetObjectId(state->funcregproc));
-//    if (!HeapTupleIsValid(tuple))
-//        elog(ERROR, "cache lookup failed for function %u", DatumGetObjectId(state->funcregproc));
-//    state->procStruct = (Form_pg_proc) GETSTRUCT(tuple);
-//
-//
-//    printf("proname=%s\tpronargs=%d\tprorettype=%d\n",
-//           NameStr(state->procStruct->proname),
-//           state->procStruct->pronargs,
-//           state->procStruct->prorettype
-//    );
-//
-//    /* Sanity checks */
-//
-//    if (state->procStruct->pronargs != 1)
-//        elog(ERROR, "only functions with pronargs=1 are supported, requested function has pronargs=%d",
-//             state->procStruct->pronargs);
-//    if (state->procStruct->prorettype != TEXTOID)
-//        elog(ERROR, "requested function does not return \"text\", but oid=%d", state->procStruct->prorettype);
-//
-//    out = transform_jsonb_string_values(jb, state, action);
-//
-//    ReleaseSysCache(tuple);
-//
-//    pfree(state);
-//    PG_RETURN_JSONB_P(out);
-//}
-
 #define FUNC_OID(f) (DatumGetObjectId((f)->proc))
 
 
@@ -162,7 +61,6 @@ static text *
 variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     JsonbApplyState *state = (JsonbApplyState *) _state;
     Func *f = state->f;
-    Oid foid = state->f->proc;
     Oid collation = state->fncollation;
 
     int f_nargs = f->form->pronargs;
@@ -170,7 +68,6 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     Datum arg0;
     CStringGetTextDatum(elem_value);
     Datum *args1_n = state->funcargs1_n;
-    Oid *args1_n_types = state->funcargs1_n_types;
 
     Datum result;
 
@@ -185,7 +82,6 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
 
     switch (f_nargs) {
         case 0:
-            /* DirectFunctionCall0Coll */
             result = FunctionCall0Coll(f->finfo, collation);
             break;
         case 1:
@@ -221,21 +117,20 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
                                              args1_n[3], args1_n[4], args1_n[5], args1_n[6], args1_n[7]);
             break;
         default:
-            result = CStringGetTextDatum("INVALID");
-            break;
+            ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                            errmsg("functions with more than 9 arguments are not supported")));
     }
 
     return DatumGetTextPP(result);;
 
-
 }
 
 
-Datum
+static Datum
 jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *types, Oid collation) {
     Jsonb *jb = DatumGetJsonbP(args[0]);
     char *funcdef = text_to_cstring(DatumGetTextPP(args[1]));
-    Datum result;
     Jsonb *out;
 
     HeapTuple tuple;
@@ -281,13 +176,6 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
 
     /* Sanity checks  */
     {
-//        if (f->form->pronargs < 1)
-//            elog(ERROR, "function %s does not accept any argument", NameStr(f->form->proname));
-
-//        if (f->form->pronargs != nargs - 1)
-//            elog(ERROR, "function %s accepts %d args, but you have supplied %d", NameStr(f->form->proname),
-//                 f->form->pronargs, nargs - 2);
-
         if (f->form->prorettype != TEXTOID)
             elog(ERROR, "function %s does not return text", NameStr(f->form->proname));
     }
@@ -298,6 +186,7 @@ jsonb_apply_worker(int nargs, const Datum *args, const bool *nulls, const Oid *t
             funcargs1_n = NULL;
             funcargs1_n_types = NULL;
         } else {
+            /*TODO: use pointer arithmetic for this */
             funcargs1_n = palloc0(sizeof(Datum) * f->form->pronargs - 1);
             funcargs1_n_types = palloc0(sizeof(Oid) * f->form->pronargs - 1);
 
