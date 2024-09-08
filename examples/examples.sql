@@ -1,10 +1,10 @@
-select jsonb_apply('{
-  "id": 1,
+select jsonb_apply('{"id": 1,
   "name": "John",
   "messages": [
     "hello"
   ]
-}', 'reverse');
+}', 'replace', 'hello', 'bye');
+
 select jsonb_apply('{
   "id": 1,
   "name": "  John ",
@@ -12,13 +12,8 @@ select jsonb_apply('{
     "    hELLo  "
   ]
 }', 'btrim');
-select jsonb_apply('{
-  "id": 1,
-  "name": "John",
-  "messages": [
-    "hello"
-  ]
-}', 'md5');
+
+select jsonb_apply('"abc~@~def~@~ghi"', 'split_part', '~@~', 2);
 
 select jsonb_filter_apply('{
   "id": 1,
@@ -26,20 +21,4 @@ select jsonb_filter_apply('{
   "messages": [
     "hello"
   ]
-}','{messages}', 'md5');
-
-select jsonb_apply('{
-  "id": 1,
-  "name": "John",
-  "messages": [
-    "hello"
-  ]
-}', 'repeat', 3);
-
-select jsonb_apply('{
-  "id": 1,
-  "name": "John",
-  "messages": [
-    "hello"
-  ]
-}', 'replace', 'hello', 'bye');
+}', '{messages}', 'md5');
