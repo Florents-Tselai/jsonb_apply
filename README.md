@@ -92,7 +92,7 @@ There's also a variant that applies the function to a sub-object of the original
 See [json_extract_path](https://pgpedia.info/j/json_extract_path.html).
 
 ```tsql
-select jsonb_filter_apply(doc jsonb, filter text[] text[, variadic "any" args1_n]);
+select jsonb_filter_apply(doc jsonb, path_elems text[] text[, variadic "any" args1_n]);
 ```
 
 Currently only functions with signature like `func(text, arg1 "any", ...) → text` are supported.
