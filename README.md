@@ -14,6 +14,8 @@ select jsonb_apply('{
     "hello"
   ]
 }', 'upper');
+```
+```tsql
                    jsonb_apply                    
 --------------------------------------------------
  {"id": 1, "name": "JOHN", "messages": ["HELLO"]}
@@ -28,6 +30,8 @@ select jsonb_apply('{
     "hello"
   ]
 }', 'replace', 'hello', 'bye');
+```
+```tsql
                   jsonb_apply                   
 ------------------------------------------------
  {"id": 1, "name": "John", "messages": ["bye"]}
@@ -43,6 +47,8 @@ select jsonb_apply('{
     "    hELLo  "
   ]
 }', 'btrim');
+```
+```tsql
                    jsonb_apply                    
 --------------------------------------------------
  {"id": 1, "name": "John", "messages": ["hELLo"]}
@@ -52,12 +58,13 @@ select jsonb_apply('{
 
 ```tsql
 select jsonb_apply('"abc~@~def~@~ghi"', 'split_part', '~@~', 2);
+```
+```tsql
  jsonb_apply 
 -------------
  "def"
 (1 row)
 ```
-
 
 ```tsql
 select jsonb_filter_apply('{
@@ -67,6 +74,8 @@ select jsonb_filter_apply('{
     "hello"
   ]
 }', '{messages}', 'md5');
+```
+```tsql
           jsonb_filter_apply          
 --------------------------------------
  ["5d41402abc4b2a76b9719d911017c592"]
