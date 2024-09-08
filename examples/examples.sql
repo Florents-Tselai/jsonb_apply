@@ -1,4 +1,13 @@
-select jsonb_apply('{"id": 1,
+select jsonb_apply('{
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
+  ]
+}', 'upper');
+
+select jsonb_apply('{
+  "id": 1,
   "name": "John",
   "messages": [
     "hello"
