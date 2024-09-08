@@ -35,7 +35,7 @@ void _PG_fini(void) {
 
 /* A struct to pass around as a "callable" */
 typedef struct Func {
-    text *indef; /* As provided by the user */
+    // text *indef; /* As provided by the user */
 
     Datum proc; /* proc OID */
     FmgrInfo *finfo;
@@ -46,7 +46,7 @@ typedef struct Func {
 typedef struct JsonbApplyState {
     FunctionCallInfo top_fcinfo; /* fcinfo from top jsonb_apply(PG_FUNCTION_ARGS)*/
     Datum funcregproc; /* the fucnregproc to be applied */
-    int nargs;
+    // int nargs;
     Form_pg_proc procStruct; /*  */
     const Datum *funcargs1_n; /* arg0 is the json value itself, additional are supplied by the user. */
     const Oid *funcargs1_n_types;
@@ -65,9 +65,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
 
     int f_nargs = f->form->pronargs;
     PGFunction fn = f->finfo->fn_addr;
-    Datum arg0;
-    CStringGetTextDatum(elem_value);
-    Datum *args1_n = state->funcargs1_n;
+    const Datum *args1_n = state->funcargs1_n;
 
     Datum result;
 
@@ -78,7 +76,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
         elemcopy[elem_len] = '\0';
     }
 
-    arg0 = CStringGetTextDatum(elemcopy);
+    Datum arg0 = CStringGetTextDatum(elemcopy);
 
     switch (f_nargs) {
         case 0:
@@ -131,16 +129,16 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
                    int nargs,
                    bool withvarargs, int nvarargs,
                    const Datum *varargs, const bool *varnulls,
-                   const Oid *vartypes, Oid collation) {
+                   const Oid *varargstypes, Oid collation) {
     HeapTuple tuple;
 
     Func *f = palloc0(sizeof(Func));
-    f->indef = funcdef;
+    // f->indef = funcdef;
 
     JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
 
     state->f = f;
-    state->nargs = nargs;
+    // state->nargs = nargs;
     state->fncollation = collation;
 
     /* without varargs */
@@ -150,19 +148,44 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
         /* withvarargs */
     } else {
         state->funcargs1_n = varargs;
-        state->funcargs1_n_types = vartypes;
+        state->funcargs1_n_types = varargstypes;
     }
 
     /* Search for the function in the catalog and fill-in the Func struct */
 
-    if (!DirectInputFunctionCallSafe(regprocedurein, text_to_cstring(funcdef),
-                                     InvalidOid, -1,
-                                     NULL,
-                                     &f->proc))
+    bool funcdef_withargtypes = false;
 
-        ereport(ERROR,
-            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                errmsg("Invalid function name: %s", text_to_cstring(funcdef))));
+    /* e.g. func(text,text,integer)  */
+    if (funcdef_withargtypes) {
+        if (!DirectInputFunctionCallSafe(regprocedurein, text_to_cstring(funcdef),
+                                         InvalidOid, -1,
+                                         NULL,
+                                         &f->proc))
+
+            ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                    errmsg("Invalid function name: %s", text_to_cstring(funcdef))));
+    } else {
+        /* we only have a function name and have to infer the argument types */
+
+        int lookup_nargs = (withvarargs ? 1 + nvarargs : 1);
+        Oid *lookup_argtypes = (Oid *) palloc0(lookup_nargs * sizeof(Oid));
+        lookup_argtypes[0] = TEXTOID;
+
+        for (int i = 1; i < lookup_nargs; i++)
+            lookup_argtypes[i] = varargstypes[i-1];
+
+        Oid procOid = LookupFuncName(list_make1(makeString(text_to_cstring(funcdef))),
+                                     lookup_nargs,
+                                     lookup_argtypes,
+                                     false);
+        pfree(lookup_argtypes);
+
+        if (!OidIsValid(procOid))
+            ereport(ERROR, (errmsg("Function %s not found", text_to_cstring(funcdef))));
+
+        f->proc = ObjectIdGetDatum(procOid);
+    }
 
 
     /* Lets' fill in the state->procStruct which contains info about the function we call (see pg_proc relation) */
@@ -208,6 +231,8 @@ Datum
 jsonb_apply(PG_FUNCTION_ARGS) {
     Jsonb *jb = PG_GETARG_JSONB_P(0);
     text *funcdef = PG_GETARG_TEXT_PP(1);
+    /* A hack to trick the parser. true when call with (jsonb, text, null) */
+    bool variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
 
     Datum *varargs;
     bool *varnulls;
@@ -217,8 +242,9 @@ jsonb_apply(PG_FUNCTION_ARGS) {
     int nvarargs = extract_variadic_args(fcinfo, 2, true,
                                          &varargs, &vartypes, &varnulls);
 
-    bool withvarargs = (nvarargs == -1) ? false : true;
+    bool withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
 
+    printf("withvarargs=%d\n", withvarargs);
     PG_RETURN_DATUM(
         jsonb_apply_worker(jb, funcdef, PG_NARGS(), withvarargs, nvarargs, varargs, varnulls, vartypes, fcinfo->
             fncollation));

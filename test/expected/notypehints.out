@@ -1,0 +1,84 @@
+-- error messages
+select jsonb_apply('"hello"', 'length');
+ERROR:  function length does not return text
+select jsonb_apply('"hello"', 'gsdgfd');
+ERROR:  function gsdgfd(text) does not exist
+create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
+-- funcs with nargs=0
+select jsonb_apply('"hello"', 'lorem()');
+ERROR:  function lorem()(text) does not exist
+-- funcs with nargs=1
+select jsonb_apply('"hello"', 'lower');
+ jsonb_apply 
+-------------
+ "hello"
+(1 row)
+
+select jsonb_apply('"hello"', 'upper');
+ jsonb_apply 
+-------------
+ "HELLO"
+(1 row)
+
+select jsonb_apply('"hello"', 'reverse');
+ jsonb_apply 
+-------------
+ "olleh"
+(1 row)
+
+select jsonb_apply('"    hELLo  "', 'ltrim');
+ jsonb_apply 
+-------------
+ "hELLo  "
+(1 row)
+
+select jsonb_apply('"    hELLo  "', 'rtrim');
+ jsonb_apply 
+-------------
+ "    hELLo"
+(1 row)
+
+select jsonb_apply('"    hELLo  "', 'btrim');
+ jsonb_apply 
+-------------
+ "hELLo"
+(1 row)
+
+-- funcs with combination of argtypes
+select jsonb_apply('"hello world"', 'replace', 'hello', 'bye');
+ jsonb_apply 
+-------------
+ "bye world"
+(1 row)
+
+select jsonb_apply('"Pg"', 'repeat', 3);
+ jsonb_apply 
+-------------
+ "PgPgPg"
+(1 row)
+
+select jsonb_apply('"abc~@~def~@~ghi"', 'split_part', '~@~', 2);
+ jsonb_apply 
+-------------
+ "def"
+(1 row)
+
+-- complex object, just checking for spurious pointers.
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'lower');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "john", "l": "doe", "arr": ["hello", {"k": "value"}], "message": "who are you?"}
+(1 row)
+
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'upper');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "JOHN", "l": "DOE", "arr": ["HELLO", {"k": "VALUE"}], "message": "WHO ARE YOU?"}
+(1 row)
+
+select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse');
+                                      jsonb_apply                                       
+----------------------------------------------------------------------------------------
+ {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
+(1 row)
+
