@@ -20,13 +20,13 @@ select jsonb_apply('{
   ]
 }', 'md5');
 
-select jsonb_apply('{
+select jsonb_filter_apply('{
   "id": 1,
   "name": "John",
   "messages": [
     "hello"
   ]
-}'::jsonb #> '{messages}', 'md5');
+}','{messages}', 'md5');
 
 select jsonb_apply('{
   "id": 1,
