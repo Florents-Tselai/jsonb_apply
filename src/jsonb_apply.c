@@ -173,7 +173,7 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
         lookup_argtypes[0] = TEXTOID;
 
         for (int i = 1; i < lookup_nargs; i++)
-            lookup_argtypes[i] = varargstypes[i-1];
+            lookup_argtypes[i] = varargstypes[i - 1];
 
         Oid procOid = LookupFuncName(list_make1(makeString(text_to_cstring(funcdef))),
                                      lookup_nargs,
@@ -225,21 +225,37 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
     PG_RETURN_JSONB_P(out);
 }
 
-PG_FUNCTION_INFO_V1(jsonb_apply);
 
-Datum
-jsonb_apply(PG_FUNCTION_ARGS) {
-    Jsonb *jb = PG_GETARG_JSONB_P(0);
-    text *funcdef = PG_GETARG_TEXT_PP(1);
+Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
+    Jsonb *jb;
+    text *funcdef;
+    bool with_filter = false;
+    Datum filter;
+    bool variadic_null = false;
+    int variadic_start;
+
+    if (withfilter) {
+        filter = PG_GETARG_DATUM(1);
+        jb = DatumGetJsonbP(DirectFunctionCall2(jsonb_extract_path, PG_GETARG_DATUM(0), filter));
+        funcdef = PG_GETARG_TEXT_PP(2);
+        variadic_null = PG_NARGS() == 4 && PG_ARGISNULL(3);
+        variadic_start = 3;
+    } else {
+        // filter = PG_GETARG_DATUM(1);
+        jb = PG_GETARG_JSONB_P(0);
+        funcdef = PG_GETARG_TEXT_PP(1);
+        variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
+        variadic_start = 2;
+    }
+
     /* A hack to trick the parser. true when call with (jsonb, text, null) */
-    bool variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
 
     Datum *varargs;
     bool *varnulls;
     Oid *vartypes;
 
     /* build argument values to build the object */
-    int nvarargs = extract_variadic_args(fcinfo, 2, true,
+    int nvarargs = extract_variadic_args(fcinfo, variadic_start, true,
                                          &varargs, &vartypes, &varnulls);
 
     bool withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
@@ -248,4 +264,18 @@ jsonb_apply(PG_FUNCTION_ARGS) {
     PG_RETURN_DATUM(
         jsonb_apply_worker(jb, funcdef, PG_NARGS(), withvarargs, nvarargs, varargs, varnulls, vartypes, fcinfo->
             fncollation));
+}
+
+PG_FUNCTION_INFO_V1(jsonb_filter_apply);
+
+Datum
+jsonb_filter_apply(PG_FUNCTION_ARGS) {
+    return jsonb_apply_internal(fcinfo, true);
+}
+
+PG_FUNCTION_INFO_V1(jsonb_apply_nofilter);
+
+Datum
+jsonb_apply_nofilter(PG_FUNCTION_ARGS) {
+    return jsonb_apply_internal(fcinfo, false);
 }
