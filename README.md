@@ -2,7 +2,7 @@
 
 [![build](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml/badge.svg)](https://github.com/Florents-Tselai/jsonb_apply/actions/workflows/build.yml)
 
-Have you ever wanted to recursively apply a function to a `jsonb` object?
+Have you ever wanted to apply a function to a `jsonb` object, both dynamically and recursively?
 
 No? Well, here's a Postgres extension that allows you to do just that:
 
@@ -80,17 +80,16 @@ select jsonb_apply(doc jsonb, func text[, variadic "any" args1_n]);
 ```
 
 There's also a variant that applies the function to a sub-object of the original document.
-See the [json_extract_path](https://pgpedia.info/j/json_extract_path.html).
+See [json_extract_path](https://pgpedia.info/j/json_extract_path.html).
 
 ```tsql
 select jsonb_filter_apply(doc jsonb, filter text[] text[, variadic "any" args1_n]);
 ```
 
 Currently only functions with signature like `func(text, arg1 "any", ...) → text` are supported.
-`arg0` should be `text` and is taken as the `jsonb` string value (or array element) currently being processed.
-The `variadic` arguments (if any) will be passed to `func` as `args1...argsn`, while their types will be used to search for the appropriate function in the catalog.
-
-functions applied recursively to string values or elements in `jsonb`.
+The first argument `arg0` should be `text` and is taken as the `jsonb` string value (or array element) currently being processed.
+The `variadic` arguments (if any) will be passed to `func` as `args1...argsn`.
+Bot the function name and the types of `variadic` arguments will be used to search for the appropriate function in the catalog.
 
 ## Installation
 
