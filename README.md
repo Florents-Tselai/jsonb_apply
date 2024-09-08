@@ -4,8 +4,19 @@
 Have you ever wanted to recursively apply a function to a `jsonb` object?
 Like this 
 ```tsql
-select jsonb_apply(jsonb, func);
+select jsonb_apply('{
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
+  ]
+}', 'reverse');
+                   jsonb_apply                    
+--------------------------------------------------
+ {"id": 1, "name": "nhoJ", "messages": ["olleh"]}
+(1 row)
 ```
+
 No? Well, here's a Postgres extension that allows you to do just that:
 
 ## Usage
@@ -13,44 +24,81 @@ No? Well, here's a Postgres extension that allows you to do just that:
 ```tsql
 select jsonb_apply(doc jsonb, func text[, variadic "any" args1_n]);
 ```
+Currently only functions with signature like `func(text, arg1 "any", ...) → text` are supported.
+`arg0` should be `text` and is taken as the `jsonb` string value (or array element) currently being processed.
+The `variadic` arguments (if any) will be passed to `func` as `args1...argsn`, while their types will be used to search for the appropriate function in the catalog.
 
-Currently supports `func(text)->text` functions applied recursively to string values or elements in `jsonb`.
+functions applied recursively to string values or elements in `jsonb`.
 ```tsql
 create extension jsonb_apply;
 ```
 
-```sql
-select jsonb_apply('{"first": "John", "last": "Doe", "message": "Who are you?"}', 'lower(text)');
-                         jsonb_apply                         
--------------------------------------------------------------
- {"last": "doe", "first": "john", "message": "who are you?"}
-(1 row)
-
-```
-
-```sql
-select jsonb_apply('{"message":  "a secret"}', 'md5(text)');
-                   jsonb_apply                   
--------------------------------------------------
- {"message": "8b32185212f8625d1752b360f224fba2"}
-(1 row)
-```
-
-```sql
+```tsql
 select jsonb_apply('{
-  "f": "John",
-  "l": "Doe",
-  "message": "Who are you?",
-  "arr": [
-    "Hello",
-    {
-      "k": "value"
-    }
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
   ]
-}', 'reverse(text)');
-                                      jsonb_apply                                       
-----------------------------------------------------------------------------------------
- {"f": "nhoJ", "l": "eoD", "arr": ["olleH", {"k": "eulav"}], "message": "?uoy era ohW"}
+}', 'reverse');
+                   jsonb_apply                    
+--------------------------------------------------
+ {"id": 1, "name": "nhoJ", "messages": ["olleh"]}
+(1 row)
+```
+```tsql
+select jsonb_apply('{
+  "id": 1,
+  "name": "  John ",
+  "messages": [
+    "    hELLo  "
+  ]
+}', 'btrim');
+                   jsonb_apply                    
+--------------------------------------------------
+ {"id": 1, "name": "John", "messages": ["hELLo"]}
+(1 row)
+```
+
+```tsql
+select jsonb_apply('{
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
+  ]
+}', 'md5');
+                                               jsonb_apply                                               
+---------------------------------------------------------------------------------------------------------
+ {"id": 1, "name": "61409aa1fd47d4a5332de23cbf59a36f", "messages": ["5d41402abc4b2a76b9719d911017c592"]}
+(1 row)
+```
+
+```tsql
+select jsonb_apply('{
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
+  ]
+}', 'repeat', 3);
+                            jsonb_apply                             
+--------------------------------------------------------------------
+ {"id": 1, "name": "JohnJohnJohn", "messages": ["hellohellohello"]}
+(1 row)
+```
+
+```tsql
+select jsonb_apply('{
+  "id": 1,
+  "name": "John",
+  "messages": [
+    "hello"
+  ]
+}', 'replace', 'hello', 'bye');
+                  jsonb_apply                   
+------------------------------------------------
+ {"id": 1, "name": "John", "messages": ["bye"]}
 (1 row)
 ```
 
