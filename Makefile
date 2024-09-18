@@ -12,9 +12,9 @@ MODULE_big = $(EXTENSION)
 
 OBJS = src/$(EXTENSION).o
 
-TESTS = $(wildcard test/sql/notypehints.sql)
+TESTS = $(wildcard test/sql/regproc.sql)
 ifdef TEST_TYPEHINTS
-TESTS += tests/sql/withtypehints.sql
+TESTS += tests/sql/regprocedure.sql
 endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --inputdir=test --load-extension=$(EXTENSION)
