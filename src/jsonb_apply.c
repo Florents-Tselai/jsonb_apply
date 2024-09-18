@@ -225,31 +225,33 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
     PG_RETURN_JSONB_P(out);
 }
 
-/* Actual implementation for jsonb_apply(jsonb, text/regproc/regprocedure, variadic "any" default null) */
+/* Implementation for jsonb_apply(jsonb, text/regproc/regprocedure, variadic "any" default null) */
 Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
     /* Input */
-    Jsonb *jb; /* That's always the first argument */
-    Datum funcdefDatum;
-    Oid funcdefOid;
+    Jsonb   *jb;                    /* That's always the first argument */
+    Datum   fnKey;                  /* The function the user says wants to apply, we toggle on its Oid later*/
 
-    bool variadic_null = false;
+    bool variadic_null = false;     /* Are we in a variadic = null case ? */
+    int variadic_start;             /* At what index variadic args start ? */
+
     bool withvarargs;
     int nvarargs;
     Datum *varargs;
     bool *varnulls;
     Oid *vartypes;
 
-    text *funcdef;
-    Datum filter;
-    int variadic_start;
+    /* Function metadata */
+    Oid fnOid;                      /* The Oid we'll be looking for: oid of the function the user actually wants */
+    FmgrInfo fnFinfo;
+    Form_pg_proc fnForm;             /* how fn appears in the pg_proc relation*/
+    PGFunction fn;
 
     if (!withfilter) {
         /* jsonb_apply(jsonb, text/regproc/regprocedure, args) */
         jb = PG_GETARG_JSONB_P(0);
-        funcdefDatum = PG_GETARG_DATUM(1);
-        funcdefOid = PG_GETARG_OID(1);
+        fnKey = PG_GETARG_DATUM(1);
         Assert((funcdefDatum == TEXTOID) || (funcdefOid == REGPROCOID));
-        funcdef = PG_GETARG_TEXT_PP(1);
+        fnKey = PG_GETARG_DATUM(1);
         variadic_start = 2;
         variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
     } else {
@@ -259,22 +261,60 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
          * so we apply the filter first,
          * and then like the if-block above but the rest of the indices are shifted by +1
          */
-        filter = PG_GETARG_DATUM(1);
+        Datum filter = PG_GETARG_DATUM(1);
         /* We apply the filter before anything else */
         jb = DatumGetJsonbP(DirectFunctionCall2(jsonb_extract_path, PG_GETARG_DATUM(0), filter));
-        funcdef = PG_GETARG_TEXT_PP(2);
+        fnKey = PG_GETARG_DATUM(2);
 
         variadic_start = 3;
         variadic_null = PG_NARGS() == 4 && PG_ARGISNULL(3);
     }
 
-    /* build argument values to build the object */
-    nvarargs = extract_variadic_args(fcinfo, variadic_start, true,
-                                         &varargs, &vartypes, &varnulls);
+    /* extract variadic args and their metadata */
+    nvarargs = extract_variadic_args(fcinfo, variadic_start, true, &varargs, &vartypes, &varnulls);
 
     withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
 
-    printf("withvarargs=%d\n", withvarargs);
+    /* Now that we have info about the arguments we can combine them with fnKey to search for the function */
+
+    /* We start by creating the array of argument types to look up with.
+     * The first argument is assumed to be of text type (the individual Json string).
+     * The rest are fetched from the other varargs.
+     */
+
+    int lookup_nargs = (withvarargs ? 1 + nvarargs : 1);
+    Oid *lookup_argtypes = (Oid *) palloc0(lookup_nargs * sizeof(Oid));
+    lookup_argtypes[0] = TEXTOID;
+
+    for (int i = 1; i < lookup_nargs; i++)
+        lookup_argtypes[i] = vartypes[i - 1];
+
+    /* Lookup the function */
+    switch (DatumGetObjectId(fnKey)) {
+        case TEXTOID: {
+            fnOid = LookupFuncName(list_make1(makeString(text_to_cstring(DatumGetTextP(fnKey)))),
+                                     lookup_nargs,
+                                     lookup_argtypes,
+                                     false);
+        }
+        default:
+            ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                        errmsg("to specify a function you can only use its name")));
+
+    }
+
+    HeapTuple tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fnOid));
+    if (!HeapTupleIsValid(tuple))
+        elog(ERROR, "cache lookup failed for function %u", fnOid);
+    fnForm = (Form_pg_proc) GETSTRUCT(tuple);
+    ReleaseSysCache(tuple);
+
+    // f->finfo = palloc0(sizeof(FmgrInfo));
+    // fmgr_info(FUNC_OID(f), f->finfo);
+    JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
+
+
     PG_RETURN_DATUM(
         jsonb_apply_worker(jb, funcdef, PG_NARGS(), withvarargs, nvarargs, varargs, varnulls, vartypes, fcinfo->
             fncollation));
