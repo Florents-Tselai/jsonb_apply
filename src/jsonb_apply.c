@@ -225,40 +225,54 @@ jsonb_apply_worker(Jsonb *jb, text *funcdef,
     PG_RETURN_JSONB_P(out);
 }
 
-
+/* Actual implementation for jsonb_apply(jsonb, text/regproc/regprocedure, variadic "any" default null) */
 Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
-    Jsonb *jb;
-    text *funcdef;
-    bool with_filter = false;
-    Datum filter;
+    /* Input */
+    Jsonb *jb; /* That's always the first argument */
+    Datum funcdefDatum;
+    Oid funcdefOid;
+
     bool variadic_null = false;
-    int variadic_start;
-
-    if (withfilter) {
-        filter = PG_GETARG_DATUM(1);
-        jb = DatumGetJsonbP(DirectFunctionCall2(jsonb_extract_path, PG_GETARG_DATUM(0), filter));
-        funcdef = PG_GETARG_TEXT_PP(2);
-        variadic_null = PG_NARGS() == 4 && PG_ARGISNULL(3);
-        variadic_start = 3;
-    } else {
-        // filter = PG_GETARG_DATUM(1);
-        jb = PG_GETARG_JSONB_P(0);
-        funcdef = PG_GETARG_TEXT_PP(1);
-        variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
-        variadic_start = 2;
-    }
-
-    /* A hack to trick the parser. true when call with (jsonb, text, null) */
-
+    bool withvarargs;
+    int nvarargs;
     Datum *varargs;
     bool *varnulls;
     Oid *vartypes;
 
+    text *funcdef;
+    Datum filter;
+    int variadic_start;
+
+    if (!withfilter) {
+        /* jsonb_apply(jsonb, text/regproc/regprocedure, args) */
+        jb = PG_GETARG_JSONB_P(0);
+        funcdefDatum = PG_GETARG_DATUM(1);
+        funcdefOid = PG_GETARG_OID(1);
+        Assert((funcdefDatum == TEXTOID) || (funcdefOid == REGPROCOID));
+        funcdef = PG_GETARG_TEXT_PP(1);
+        variadic_start = 2;
+        variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
+    } else {
+        /*
+         * jsonb_apply(jsonb, text[], text/regproc/regprocedure, args).
+         * We have a filter which is idx_arg=1,
+         * so we apply the filter first,
+         * and then like the if-block above but the rest of the indices are shifted by +1
+         */
+        filter = PG_GETARG_DATUM(1);
+        /* We apply the filter before anything else */
+        jb = DatumGetJsonbP(DirectFunctionCall2(jsonb_extract_path, PG_GETARG_DATUM(0), filter));
+        funcdef = PG_GETARG_TEXT_PP(2);
+
+        variadic_start = 3;
+        variadic_null = PG_NARGS() == 4 && PG_ARGISNULL(3);
+    }
+
     /* build argument values to build the object */
-    int nvarargs = extract_variadic_args(fcinfo, variadic_start, true,
+    nvarargs = extract_variadic_args(fcinfo, variadic_start, true,
                                          &varargs, &vartypes, &varnulls);
 
-    bool withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
+    withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
 
     printf("withvarargs=%d\n", withvarargs);
     PG_RETURN_DATUM(
@@ -266,10 +280,10 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
             fncollation));
 }
 
-PG_FUNCTION_INFO_V1(jsonb_filter_apply);
+PG_FUNCTION_INFO_V1(jsonb_apply_withfilter);
 
 Datum
-jsonb_filter_apply(PG_FUNCTION_ARGS) {
+jsonb_apply_withfilter(PG_FUNCTION_ARGS) {
     return jsonb_apply_internal(fcinfo, true);
 }
 
