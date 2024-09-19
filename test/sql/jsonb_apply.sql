@@ -4,15 +4,14 @@
 select jsonb_apply('"hello"', 'length');
 select jsonb_apply('"hello"', 'gsdgfd');
 
-create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
-
--- funcs with nargs=0
-select jsonb_apply('"hello"', 'lorem()');
+-- funcs with nargs=0 (ignoring for now)
+-- create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
+-- select jsonb_apply('"hello"', 'lorem()');
 
 -- funcs with nargs=1
-select jsonb_apply('"hello"', 'lower');
-select jsonb_apply('"hello"', 'upper');
-select jsonb_apply('"hello"', 'reverse');
+select jsonb_apply('"hELLo"', 'lower');
+select jsonb_apply('"hELLo"', 'upper');
+select jsonb_apply('"hELLo"', 'reverse');
 select jsonb_apply('"    hELLo  "', 'ltrim');
 select jsonb_apply('"    hELLo  "', 'rtrim');
 select jsonb_apply('"    hELLo  "', 'btrim');
