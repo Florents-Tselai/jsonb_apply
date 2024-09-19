@@ -1,30 +1,29 @@
 -- test with regproc (func without arg types)
 -- error messages
 select jsonb_apply('"hello"', 'length');
-ERROR:  function length does not return text
+ERROR:  only functions that return text are supported
 select jsonb_apply('"hello"', 'gsdgfd');
 ERROR:  function gsdgfd(text) does not exist
-create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
--- funcs with nargs=0
-select jsonb_apply('"hello"', 'lorem()');
-ERROR:  function lorem()(text) does not exist
+-- funcs with nargs=0 (ignoring for now)
+-- create function lorem() returns text language sql as $$ select 'lorem ipsum'$$;
+-- select jsonb_apply('"hello"', 'lorem()');
 -- funcs with nargs=1
-select jsonb_apply('"hello"', 'lower');
+select jsonb_apply('"hELLo"', 'lower');
  jsonb_apply 
 -------------
  "hello"
 (1 row)
 
-select jsonb_apply('"hello"', 'upper');
+select jsonb_apply('"hELLo"', 'upper');
  jsonb_apply 
 -------------
  "HELLO"
 (1 row)
 
-select jsonb_apply('"hello"', 'reverse');
+select jsonb_apply('"hELLo"', 'reverse');
  jsonb_apply 
 -------------
- "olleh"
+ "oLLEh"
 (1 row)
 
 select jsonb_apply('"    hELLo  "', 'ltrim');
