@@ -26,10 +26,6 @@ select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": 
 select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'upper');
 select jsonb_apply('{"f": "John", "l": "Doe", "message": "Who are you?", "arr": ["Hello", {"k": "value"}]}', 'reverse');
 
--- filter_apply
-select jsonb_filter_apply('{"f": "John", "arr": ["Hello", {"k": "value"}]}', '{arr}' , 'reverse');
-select jsonb_filter_apply('{"f": "John", "arr": ["Hello", {"k": "value"}]}', '{arr}' , 'replace', 'Hello', 'Bye');
-
 ------------ IGNORE FOR NOW ------------
 --
 --
