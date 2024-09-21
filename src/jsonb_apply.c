@@ -5,9 +5,7 @@
 #include "utils/builtins.h"
 #include "utils/jsonb.h"
 #include "utils/jsonfuncs.h" /* transform_jsonb_string_values */
-#include "utils/formatting.h"
 #include "catalog/pg_proc.h"
-#include "utils/regproc.h"
 #include "utils/syscache.h"
 #include "access/htup_details.h"
 #include "parser/parse_func.h"
@@ -22,16 +20,14 @@
 #define TYPALIGN_INT 'i'
 #endif
 
-
 PG_MODULE_MAGIC;
 
-void
-_PG_init(void) {
-}
+/* Declarations */
+static text *variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len);
 
-void _PG_fini(void) {
-}
+Datum jsonb_apply_internal(PG_FUNCTION_ARGS);
 
+PG_FUNCTION_INFO_V1(jsonb_apply);
 
 typedef struct JsonbApplyState {
     Oid collation;
@@ -41,7 +37,6 @@ typedef struct JsonbApplyState {
 } JsonbApplyState;
 
 #define FUNC_OID(f) (DatumGetObjectId((f)->proc))
-
 
 static text *
 variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
@@ -104,43 +99,34 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
     return DatumGetTextPP(result);;
 }
 
-/* Implementation for jsonb_apply(jsonb, text/regproc/regprocedure, variadic "any" default null) */
+/* Implementation for jsonb_apply(jsonb, text, variadic "any" default null) */
 Datum jsonb_apply_internal(FunctionCallInfo fcinfo) {
     /* Input */
-    Jsonb *jb; /* That's always the first argument */
-    Datum fnKey; /* The function the user says wants to apply, we toggle on its Oid later*/
-    Oid fnKeyTypeOid;
+    Jsonb *jb = PG_GETARG_JSONB_P(0); /* That's always the first argument */
+    Datum fnKey = PG_GETARG_DATUM(1); /* The function the user says wants to apply, we toggle on its Oid later*/
+    Oid fnKeyTypeOid = get_fn_expr_argtype(fcinfo->flinfo, 1);
+    int variadic_start = 2;
+    bool variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2); /* Are we in a variadic = null case ? */
 
-    bool variadic_null = false; /* Are we in a variadic = null case ? */
-    int variadic_start; /* At what index variadic args start ? */
-
-    bool withvarargs;
-    int nvarargs;
     Datum *varargs;
     bool *varnulls;
     Oid *vartypes;
 
     /* Function metadata */
     Oid fnOid; /* The Oid we'll be looking for: oid of the function the user actually wants */
-    FmgrInfo fnFinfo;
+    HeapTuple tuple;
     Form_pg_proc fnForm; /* how fn appears in the pg_proc relation*/
-    PGFunction fn;
 
-    /* jsonb_apply(jsonb, text/regproc/regprocedure, args) */
-    jb = PG_GETARG_JSONB_P(0);
+    JsonbApplyState *state;
+    JsonTransformStringValuesAction action;
 
-    fnKey = PG_GETARG_DATUM(1);
-    fnKeyTypeOid = get_fn_expr_argtype(fcinfo->flinfo, 1);
-
-    variadic_start = 2;
-    variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
-
-
+    /* Output */
+    Jsonb *out;
 
     /* extract variadic args and their metadata */
-    nvarargs = extract_variadic_args(fcinfo, variadic_start, true, &varargs, &vartypes, &varnulls);
+    int nvarargs = extract_variadic_args(fcinfo, variadic_start, true, &varargs, &vartypes, &varnulls);
 
-    withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
+    bool withvarargs = (nvarargs == -1 || variadic_null) ? false : true;
 
     /* Now that we have info about the arguments we can combine them with fnKey to search for the function */
 
@@ -173,7 +159,7 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo) {
 
     elog(DEBUG1, "fnKeyTypeOid=%d\tfnOid=%d\tlookup_nargs=%d\n", fnKeyTypeOid, fnOid, lookup_nargs);
 
-    HeapTuple tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fnOid));
+    tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(fnOid));
     if (!HeapTupleIsValid(tuple))
         elog(ERROR, "cache lookup failed for function %u", fnOid);
     fnForm = (Form_pg_proc) GETSTRUCT(tuple);
@@ -192,7 +178,7 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo) {
     }
 
 
-    JsonbApplyState *state = palloc0(sizeof(JsonbApplyState));
+    state = palloc0(sizeof(JsonbApplyState));
     state->collation = PG_GET_COLLATION();
     state->fnFmgrInfo = palloc0(sizeof(FmgrInfo));
     fmgr_info(fnOid, state->fnFmgrInfo);
@@ -207,17 +193,15 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo) {
         state->funcargs1_n_types = vartypes;
     }
 
-    JsonTransformStringValuesAction action = (JsonTransformStringValuesAction) variadic_apply_func_jsonb_value;
+    action = (JsonTransformStringValuesAction) variadic_apply_func_jsonb_value;
 
-    Jsonb *out = transform_jsonb_string_values(jb, state, action);
+    out = transform_jsonb_string_values(jb, state, action);
 
     pfree(state->fnFmgrInfo);
     pfree(state);
 
     PG_RETURN_JSONB_P(out);
 }
-
-PG_FUNCTION_INFO_V1(jsonb_apply);
 
 Datum
 jsonb_apply(PG_FUNCTION_ARGS) {
