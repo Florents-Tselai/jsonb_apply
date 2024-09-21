@@ -105,7 +105,7 @@ variadic_apply_func_jsonb_value(void *_state, char *elem_value, int elem_len) {
 }
 
 /* Implementation for jsonb_apply(jsonb, text/regproc/regprocedure, variadic "any" default null) */
-Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
+Datum jsonb_apply_internal(FunctionCallInfo fcinfo) {
     /* Input */
     Jsonb *jb; /* That's always the first argument */
     Datum fnKey; /* The function the user says wants to apply, we toggle on its Oid later*/
@@ -126,30 +126,15 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
     Form_pg_proc fnForm; /* how fn appears in the pg_proc relation*/
     PGFunction fn;
 
-    if (!withfilter) {
-        /* jsonb_apply(jsonb, text/regproc/regprocedure, args) */
-        jb = PG_GETARG_JSONB_P(0);
+    /* jsonb_apply(jsonb, text/regproc/regprocedure, args) */
+    jb = PG_GETARG_JSONB_P(0);
 
-        fnKey = PG_GETARG_DATUM(1);
-        fnKeyTypeOid = get_fn_expr_argtype(fcinfo->flinfo, 1);
+    fnKey = PG_GETARG_DATUM(1);
+    fnKeyTypeOid = get_fn_expr_argtype(fcinfo->flinfo, 1);
 
-        variadic_start = 2;
-        variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
-    } else {
-        /*
-         * jsonb_apply(jsonb, text[], text/regproc/regprocedure, args).
-         * We have a filter which is idx_arg=1,
-         * so we apply the filter first,
-         * and then like the if-block above but the rest of the indices are shifted by +1
-         */
-        Datum filter = PG_GETARG_DATUM(1);
-        /* We apply the filter before anything else */
-        jb = DatumGetJsonbP(DirectFunctionCall2(jsonb_extract_path, PG_GETARG_DATUM(0), filter));
-        fnKey = PG_GETARG_DATUM(2);
-        fnKeyTypeOid = get_fn_expr_argtype(fcinfo->flinfo, 2);
-        variadic_start = 3;
-        variadic_null = PG_NARGS() == 4 && PG_ARGISNULL(3);
-    }
+    variadic_start = 2;
+    variadic_null = PG_NARGS() == 3 && PG_ARGISNULL(2);
+
 
 
     /* extract variadic args and their metadata */
@@ -232,16 +217,9 @@ Datum jsonb_apply_internal(FunctionCallInfo fcinfo, bool withfilter) {
     PG_RETURN_JSONB_P(out);
 }
 
-PG_FUNCTION_INFO_V1(jsonb_apply_withfilter);
+PG_FUNCTION_INFO_V1(jsonb_apply);
 
 Datum
-jsonb_apply_withfilter(PG_FUNCTION_ARGS) {
-    return jsonb_apply_internal(fcinfo, true);
-}
-
-PG_FUNCTION_INFO_V1(jsonb_apply_nofilter);
-
-Datum
-jsonb_apply_nofilter(PG_FUNCTION_ARGS) {
-    return jsonb_apply_internal(fcinfo, false);
+jsonb_apply(PG_FUNCTION_ARGS) {
+    return jsonb_apply_internal(fcinfo);
 }
